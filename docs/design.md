@@ -6,6 +6,8 @@
 
 PNG 通过 SSH 标准输入传输，不依赖终端文字粘贴协议。Windows 端使用 .NET 标准流的二进制接口，避免把图片当作字符串编码；进程句柄、超时、标准输出/错误均由独立 transport 模块管理。
 
+Windows PowerShell 5.1 的 .NET Framework 会在子进程启动时创建自动刷新的文本输入包装器。UTF-8 控制台可能因此在原始 PNG 前加入 BOM。transport 显式禁用该前导字节，兼容旧运行时并在启动后恢复调用方的输入编码；回归测试强制使用带 BOM 的 UTF-8 控制台验证全部字节值。
+
 ## X11 selection 是一个服务，不是普通文件
 
 Xvfb 提供无屏幕的 X11 服务；xclip 作为 selection owner 保持 `image/png` 数据。只把文件放到服务器目录，不会自动更新 X11 剪贴板。xclip 子进程与 Xvfb 都关闭继承的 SSH 输入/输出，避免 SSH 一直等不到 EOF。

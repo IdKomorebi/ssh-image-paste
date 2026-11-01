@@ -45,7 +45,22 @@ function Invoke-BinaryProcess {
     $inputStream = $null
     $timer = [Diagnostics.Stopwatch]::StartNew()
     try {
-        if (-not $process.Start()) { throw 'Could not start child process.' }
+        $noBom = [Text.UTF8Encoding]::new($false)
+        if ($null -ne $info.PSObject.Properties['StandardInputEncoding']) {
+            $info.StandardInputEncoding = $noBom
+            $started = $process.Start()
+        } else {
+            # .NET Framework creates an autoflushing StreamWriter during Start().
+            # A UTF-8 console can therefore prepend a BOM even when we write only BaseStream.
+            $previousEncoding = [Console]::InputEncoding
+            try {
+                [Console]::InputEncoding = $noBom
+                $started = $process.Start()
+            } finally {
+                [Console]::InputEncoding = $previousEncoding
+            }
+        }
+        if (-not $started) { throw 'Could not start child process.' }
         $stdoutTask = $process.StandardOutput.BaseStream.CopyToAsync($output)
         $stderrTask = $process.StandardError.ReadToEndAsync()
         if ($InputFile) {
@@ -53,7 +68,7 @@ function Invoke-BinaryProcess {
             $copyTask = $inputStream.CopyToAsync($process.StandardInput.BaseStream)
             if (-not $copyTask.Wait($TimeoutSeconds * 1000)) { throw 'Input transfer timed out.' }
         }
-        $process.StandardInput.Close()
+        $process.StandardInput.BaseStream.Close()
         $remaining = [math]::Max(1, $TimeoutSeconds * 1000 - [int]$timer.Elapsed.TotalMilliseconds)
         if (-not $process.WaitForExit($remaining)) { throw 'SSH process timed out.' }
         if (-not $stdoutTask.Wait(2000) -or -not $stderrTask.Wait(2000)) {

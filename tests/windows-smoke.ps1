@@ -21,10 +21,19 @@ try {
     $compiler = Join-Path ([Environment]::GetFolderPath('Windows')) 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     & $compiler /nologo /target:exe ('/out:' + $echoBinary) $echoSource
     if ($LASTEXITCODE -ne 0) { throw 'Could not compile native binary echo fixture.' }
-    $result = Invoke-BinaryProcess -FilePath $echoBinary -Arguments @('unused') -InputFile $inputPath -OutputFile $outputPath
-    if ($result.ExitCode -ne 0) { throw ('Binary echo failed: ' + $result.StdErr) }
-    if ((Get-FileHash -LiteralPath $inputPath).Hash -ne (Get-FileHash -LiteralPath $outputPath).Hash) {
-        throw ('Binary transport changed bytes (sent={0}, received={1}).' -f (Get-Item -LiteralPath $inputPath).Length, (Get-Item -LiteralPath $outputPath).Length)
+    $originalEncoding = [Console]::InputEncoding
+    try {
+        foreach ($encoding in @($originalEncoding, [Text.UTF8Encoding]::new($true))) {
+            [Console]::InputEncoding = $encoding
+            $result = Invoke-BinaryProcess -FilePath $echoBinary -Arguments @('unused') -InputFile $inputPath -OutputFile $outputPath
+            if ($result.ExitCode -ne 0) { throw ('Binary echo failed: ' + $result.StdErr) }
+            if ((Get-FileHash -LiteralPath $inputPath).Hash -ne (Get-FileHash -LiteralPath $outputPath).Hash) {
+                throw ('Binary transport changed bytes (sent={0}, received={1}, preamble={2}).' -f (Get-Item -LiteralPath $inputPath).Length, (Get-Item -LiteralPath $outputPath).Length, $encoding.GetPreamble().Length)
+            }
+            if ([Console]::InputEncoding.GetPreamble().Length -ne $encoding.GetPreamble().Length) { throw 'Transport changed caller console encoding.' }
+        }
+    } finally {
+        [Console]::InputEncoding = $originalEncoding
     }
     if ((ConvertTo-NativeArgument '') -cne '""') { throw 'Empty native argument quoting failed.' }
     $values = @('two words', 'quote"inside', 'C:\a path\', 'apostrophe''s', ('Unicode-' + [char]0x56fe + [char]0x7247))
@@ -48,7 +57,7 @@ try {
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     try { Invoke-BinaryProcess -FilePath $powershellPath -Arguments @('-NoProfile','-Command','Start-Sleep -Seconds 30') -TimeoutSeconds 1 | Out-Null } catch { $timedOut = $_.Exception.Message -match 'timed out' }
     if (-not $timedOut -or $stopwatch.Elapsed.TotalSeconds -gt 8) { throw 'Timeout did not stop the child promptly.' }
-    Write-Host 'PASS: PowerShell syntax, binary transport, native/Unicode argument boundaries, shell quoting, display validation, timeout.'
+    Write-Host 'PASS: PowerShell syntax, binary transport including UTF-8 BOM consoles, native/Unicode argument boundaries, shell quoting, display validation, timeout.'
 } finally {
     # Only the freshly created, uniquely named test directory is removed.
     $resolved = [IO.Path]::GetFullPath($temporary)

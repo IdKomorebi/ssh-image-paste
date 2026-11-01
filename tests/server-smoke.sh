@@ -20,6 +20,11 @@ jobs=()
 for _ in {1..4}; do "$helper" --display "$display" ensure & jobs+=("$!"); done
 for job in "${jobs[@]}"; do wait "$job"; done
 [[ $(cat "$temporary/state/display-${display#:}/Xvfb.pid") == "$original_pid" ]]
+cp "$temporary/config/env.sh" "$temporary/environment.before"
+if bash "$root/server/setup.sh" --display "$display" --prefix "$temporary/prefix" --config-dir "$temporary/config" --state-dir "$temporary/collision-state" >/dev/null 2>&1; then
+    echo 'FAIL: conflicting setup unexpectedly succeeded.' >&2; exit 1
+fi
+cmp "$temporary/environment.before" "$temporary/config/env.sh"
 "$helper" --display "$display" self-test
 "$helper" --display "$display" get > "$temporary/first.png"
 if printf 'not an image' | "$helper" --display "$display" put 2>/dev/null; then
