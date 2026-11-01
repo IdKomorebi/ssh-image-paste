@@ -1,16 +1,24 @@
 # SSH Image Paste
 
-**Paste a Windows screenshot into a Linux CLI over SSH, using the CLI's native image attachment feature.**
+**Take a local screenshot and paste it into an AI CLI on your SSH server with Alt+V.**
 
 [中文](README.md) · [Troubleshooting (中文)](docs/troubleshooting.md) · [MIT License](LICENSE)
 
-Take a screenshot with `Win+Shift+S`, focus your remote CLI in VS Code Remote-SSH, and press **Alt+V**. AutoHotkey uploads the PNG through a separate SSH connection, places it in a private Xvfb/xclip clipboard on the server, and forwards Alt+V to the CLI after the upload succeeds.
+## The problem
 
-## Why?
+You connect from your local computer to a server over SSH, then run tools such as **Claude Code CLI, Codex CLI, or Antigravity CLI** in the server terminal. You take a screenshot locally, return to the remote CLI, and press Alt+V, but no image attachment appears. You may see `clipboard unavailable` or an unreachable X11 server instead.
 
-The Windows clipboard and the server clipboard are different. Pasting text into a terminal does not transfer bitmap data to a headless Linux host. A remote CLI may report `clipboard unavailable` or an unreachable X11 server.
+The screenshot lives in your **local clipboard**, while the CLI runs on the **server** and reads the server's clipboard. SSH forwards text and keystrokes; it does not automatically synchronize image clipboards. A headless Linux server may not have a graphical clipboard at all.
 
-This bridge provides the missing remote clipboard. No server desktop, VNC, X11 network forwarding, or user systemd session is required.
+## What this project does
+
+It bridges those clipboards in the background. After one-time setup, your workflow is simply:
+
+**Take a local screenshot → focus the remote CLI input → press Alt+V → get an image attachment.**
+
+The local client reads the screenshot, uploads its PNG through SSH, puts it into a dedicated remote X11 clipboard, and triggers the CLI's native paste operation. No server desktop, VNC, X11 network forwarding, or user systemd session is required.
+
+> **Local host support: the included client currently runs on Windows; the remote host runs Linux.** For macOS, ask Claude Code to adapt the local hotkey and screenshot-reading code while reusing the server helper and PNG transport protocol. A tested macOS client is not included. CLI names above describe the use case; native paste shortcuts vary by tool/version, as noted below.
 
 ## Requirements
 

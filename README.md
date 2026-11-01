@@ -1,35 +1,49 @@
 # SSH Image Paste
 
-**Windows 截图 → SSH → Linux 剪贴板 → 远程 CLI 图片附件。**
+**本机截图后，直接 Alt+V 粘贴进 SSH 服务器上的 AI CLI。**
 
 [English](README.en.md) · [故障排查](docs/troubleshooting.md) · [工作原理与边界](docs/design.md) · [MIT License](LICENSE)
 
-在 Windows 上按 `Win+Shift+S` 截图，回到 VS Code Remote-SSH 的 CLI 输入框，按 **Alt+V**。脚本先把截图传到服务器的专用 X11 剪贴板，再把 Alt+V 交给 CLI，使用它自己的图片附件功能。
+## 你可能遇到的问题
 
-## 解决什么问题？
+你从**本机 SSH 连接到一台服务器**，然后在服务器的终端里使用 **Claude Code CLI、Codex CLI、Antigravity CLI** 等 AI 编程工具。
 
-Windows 的截图在**本机**剪贴板里，SSH 中运行的 CLI 读取的是**服务器**剪贴板。终端能粘贴文字，不代表它会把本机图片字节送到服务器。
-
-无桌面的 Linux 服务器通常又没有 X11 剪贴板。因此，直接按粘贴键可能没有反应，或出现：
+这时，你在本机截了一张图，回到远程 CLI 按 `Alt+V`，却发现图片无法像在本地一样直接贴进去：可能完全没有反应，也可能报错：
 
 ```text
 Failed to paste image: clipboard unavailable
 X11 server connection timed out because it was unreachable
 ```
 
-本项目搭了一座桥：用 SSH 传 PNG，用服务器上的 Xvfb + xclip 提供虚拟剪贴板。**不需要服务器桌面、VNC、X11 网络转发或 systemd --user。**
+**原因在于：截图在本机剪贴板中，而 CLI 运行在服务器上，读取的也是服务器的剪贴板。** SSH 终端会传递文字和按键，但不会自动同步本机的图片剪贴板；无桌面的 Linux 服务器通常连图形剪贴板服务都没有。
+
+## 这个仓库提供什么？
+
+一套在后台完成两端剪贴板桥接的方法。配置一次之后，你的操作就是：
+
+**本机截图 → 回到服务器上的 CLI 输入框 → 按 Alt+V → 图片作为附件贴进去。**
+
+其余步骤由脚本透明完成：读取本机截图，通过 SSH 传到服务器，放入服务器的虚拟剪贴板，再触发 CLI 原生贴图。日常使用时，你只需要记住截图和 Alt+V。
+
+> **本地主机支持：当前仓库提供 Windows 本地客户端，远程服务器为 Linux。** macOS 用户可以把本仓库交给 Claude Code，让它参考现有实现改写本地端；服务器端方案可以复用。下文的 Windows 都指你的本机，不是远程服务器。
+
+这里的 CLI 名称是使用场景举例；不同工具和版本的原生贴图按键可能不同，具体要求见下方兼容说明。
+
+## 它是怎么工作的？
+
+本地脚本通过 SSH 传 PNG；服务器上的 Xvfb + xclip 提供专用图片剪贴板。**不需要服务器桌面、VNC、X11 网络转发或 systemd --user。**
 
 ```mermaid
 flowchart LR
-  A[Windows 截图剪贴板] -->|VS Code 中 Alt+V| B[AutoHotkey v2]
-  B --> C[PowerShell 读取 PNG]
+  A[本机截图剪贴板] -->|VS Code 中 Alt+V| B[本地热键脚本]
+  B --> C[读取截图 PNG]
   C -->|SSH 标准输入| D[Linux helper]
   D --> E[Xvfb + xclip 专用剪贴板]
   B -->|上传成功后发送 Alt+V| F[远程 CLI 原生贴图]
   E --> F
 ```
 
-## 适用范围
+## 兼容说明
 
 | 项目 | 要求或行为 |
 |---|---|
@@ -41,6 +55,12 @@ flowchart LR
 | 权限 | 有依赖后，服务和配置均以普通用户身份运行；不依赖 sudo/systemd |
 
 该方案来自实际远程 CLI 使用场景；作者环境已完成 Windows → Ubuntu 20.04 x86_64 的 PNG 完整性测试，最初工作流已由用户确认可用。公开版增加了 X11 认证与安装脚本，自动化测试独立验证其传输和剪贴板功能。**没有逐一验证所有 CLI/版本；不要把 Codex、agy、Claude Code 的快捷键视作完全相同。**
+
+### 如果本机是 macOS
+
+当前没有附带经过验证的 macOS 客户端。可以把仓库交给 Claude Code，例如这样描述需求：
+
+> 请参考这个仓库，把 windows/ 里的本地热键和图片剪贴板读取部分改写为适用于 macOS 的客户端。保留“本机截图 → 快捷键 → 后台经 SSH 上传 → 远程 CLI 原生贴图”的流程，以及服务器 helper 的 PNG 标准输入协议。服务器端继续使用本仓库的 server/，并说明 macOS 上需要的安装和快捷键设置。
 
 ## 快速开始
 
