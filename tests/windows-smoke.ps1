@@ -12,12 +12,20 @@ try {
     $inputPath = Join-Path $temporary 'all bytes.bin'
     $outputPath = Join-Path $temporary 'read back.bin'
     [IO.File]::WriteAllBytes($inputPath, [byte[]]((0..255) * 256))
-    $childScript = '$inputStream = [Console]::OpenStandardInput(); $inputStream.CopyTo([Console]::OpenStandardOutput())'
     $powershellPath = Join-Path $PSHOME 'powershell.exe'
     if (-not (Test-Path -LiteralPath $powershellPath)) { $powershellPath = Join-Path $PSHOME 'pwsh.exe' }
-    $result = Invoke-BinaryProcess -FilePath $powershellPath -Arguments @('-NoProfile','-Command',$childScript) -InputFile $inputPath -OutputFile $outputPath
+    # Use a native console fixture, not a PowerShell text host, as the byte echo endpoint.
+    $echoSource = Join-Path $temporary 'BinaryEcho.cs'
+    $echoBinary = Join-Path $temporary 'BinaryEcho.exe'
+    [IO.File]::WriteAllText($echoSource, 'using System; class BinaryEcho { static void Main(string[] args) { Console.OpenStandardInput().CopyTo(Console.OpenStandardOutput()); } }')
+    $compiler = Join-Path ([Environment]::GetFolderPath('Windows')) 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    & $compiler /nologo /target:exe ('/out:' + $echoBinary) $echoSource
+    if ($LASTEXITCODE -ne 0) { throw 'Could not compile native binary echo fixture.' }
+    $result = Invoke-BinaryProcess -FilePath $echoBinary -Arguments @('unused') -InputFile $inputPath -OutputFile $outputPath
     if ($result.ExitCode -ne 0) { throw ('Binary echo failed: ' + $result.StdErr) }
-    if ((Get-FileHash -LiteralPath $inputPath).Hash -ne (Get-FileHash -LiteralPath $outputPath).Hash) { throw 'Binary transport changed bytes.' }
+    if ((Get-FileHash -LiteralPath $inputPath).Hash -ne (Get-FileHash -LiteralPath $outputPath).Hash) {
+        throw ('Binary transport changed bytes (sent={0}, received={1}).' -f (Get-Item -LiteralPath $inputPath).Length, (Get-Item -LiteralPath $outputPath).Length)
+    }
     if ((ConvertTo-NativeArgument '') -cne '""') { throw 'Empty native argument quoting failed.' }
     $values = @('two words', 'quote"inside', 'C:\a path\', 'apostrophe''s', ('Unicode-' + [char]0x56fe + [char]0x7247))
     $echoScript = '[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false); $args | ConvertTo-Json -Compress'
