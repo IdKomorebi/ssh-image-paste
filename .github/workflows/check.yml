@@ -1,0 +1,20 @@
+name: Checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell 5.1 syntax and binary transport
+        shell: powershell
+        run: ./tests/windows-smoke.ps1
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install X11 test dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y xvfb xclip xauth x11-utils openssl
+      - name: Isolated authenticated clipboard tests
+        run: bash tests/server-smoke.sh

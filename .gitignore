@@ -1,0 +1,9 @@
+windows/config.ini
+*.log
+*.lnk
+*.out
+*.err
+*.zip
+.work/
+.DS_Store
+Thumbs.db
