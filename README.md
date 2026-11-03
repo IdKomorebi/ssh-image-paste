@@ -10,12 +10,8 @@
 
 这时，你在本机截了一张图，回到远程 CLI 按 `Alt+V`，却发现图片无法像在本地一样直接贴进去：可能完全没有反应，也可能报错：
 
-<img width="446" height="127" alt="image" src="https://github.com/user-attachments/assets/1a763810-d997-4625-a948-b1a943c41463" />
-
-或者是
 ```text
-Failed to paste image: clipboard unavailable
-X11 server connection timed out because it was unreachable
+ Can't read your clipboard over SSH: connect with ssh -X (and instali xclip on this host) to paste images
 ```
 
 **原因在于：截图在本机剪贴板中，而 CLI 运行在服务器上，读取的也是服务器的剪贴板。** SSH 终端会传递文字和按键，但不会自动同步本机的图片剪贴板；无桌面的 Linux 服务器通常连图形剪贴板服务都没有。
