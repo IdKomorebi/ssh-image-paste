@@ -10,6 +10,9 @@
 
 这时，你在本机截了一张图，回到远程 CLI 按 `Alt+V`，却发现图片无法像在本地一样直接贴进去：可能完全没有反应，也可能报错：
 
+<img width="446" height="127" alt="image" src="https://github.com/user-attachments/assets/1a763810-d997-4625-a948-b1a943c41463" />
+
+或者是
 ```text
 Failed to paste image: clipboard unavailable
 X11 server connection timed out because it was unreachable
